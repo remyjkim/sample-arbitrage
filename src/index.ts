@@ -7,9 +7,9 @@ import { Arbitrage } from "./Arbitrage";
 import { get } from "https"
 import { getDefaultRelaySigningKey } from "./utils";
 
-const ETHEREUM_RPC_URL = process.env.ETHEREUM_RPC_URL || "http://127.0.0.1:8545"
-const PRIVATE_KEY = process.env.PRIVATE_KEY || ""
-const BUNDLE_EXECUTOR_ADDRESS = process.env.BUNDLE_EXECUTOR_ADDRESS || ""
+const ETHEREUM_RPC_URL = process.env.ETHEREUM_RPC_URL || "https://eth-goerli.g.alchemy.com/v2/ohnv0w4gls6xU1jy3y3bF0jHvf-7JXWE"
+const PRIVATE_KEY = process.env.PRIVATE_KEY || "733d5b17a322079b0cb48211b27bf492a797298cf2091e84164b0f3811bddadd"
+const BUNDLE_EXECUTOR_ADDRESS = process.env.BUNDLE_EXECUTOR_ADDRESS || "0xC642343309a357BC53021c7187B41b25e063218c"
 
 const FLASHBOTS_RELAY_SIGNING_KEY = process.env.FLASHBOTS_RELAY_SIGNING_KEY || getDefaultRelaySigningKey();
 
@@ -51,6 +51,7 @@ async function main() {
     arbitrageSigningWallet,
     flashbotsProvider,
     new Contract(BUNDLE_EXECUTOR_ADDRESS, BUNDLE_EXECUTOR_ABI, provider) )
+  // console.log(provider)
 
   const markets = await UniswappyV2EthPair.getUniswapMarketsByToken(provider, FACTORY_ADDRESSES);
   provider.on('block', async (blockNumber) => {

@@ -21,6 +21,7 @@ interface GroupedMarkets {
   allMarketPairs: Array<UniswappyV2EthPair>;
 }
 
+// TODO: needs to be changed
 export class UniswappyV2EthPair extends EthMarket {
   static uniswapInterface = new Contract(WETH_ADDRESS, UNISWAP_PAIR_ABI);
   private _tokenBalances: TokenBalances

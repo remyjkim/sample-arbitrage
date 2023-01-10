@@ -156,6 +156,7 @@ export class Arbitrage {
         continue
       }
       const bundledTransactions = [
+        // you can just plug in new txs from mempool and add new txs to the front and behiind
         {
           signer: this.executorWallet,
           transaction: transaction

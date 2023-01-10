@@ -69,6 +69,7 @@ contract FlashBotsMultiCall {
         if (_ethBalance < _ethAmountToCoinbase) {
             WETH.withdraw(_ethAmountToCoinbase - _ethBalance);
         }
+        // only if you are guaranteed to make profit off the trade, you choose to  
         block.coinbase.transfer(_ethAmountToCoinbase);
     }
 
