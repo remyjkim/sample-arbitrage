@@ -13,7 +13,7 @@ import { print } from "graphql";
 
 const ETHEREUM_RPC_URL = process.env.ETHEREUM_RPC_URL || "https://eth-goerli.g.alchemy.com/v2/ohnv0w4gls6xU1jy3y3bF0jHvf-7JXWE"
 const PRIVATE_KEY = process.env.PRIVATE_KEY || "733d5b17a322079b0cb48211b27bf492a797298cf2091e84164b0f3811bddadd"
-const BUNDLE_EXECUTOR_ADDRESS = process.env.BUNDLE_EXECUTOR_ADDRESS || "0xC642343309a357BC53021c7187B41b25e063218c"
+const BUNDLE_EXECUTOR_ADDRESS = process.env.BUNDLE_EXECUTOR_ADDRESS || "0xc6ab4196e5252F72BF642A6445B38D22b236Ba8B"
 
 const FLASHBOTS_RELAY_SIGNING_KEY = process.env.FLASHBOTS_RELAY_SIGNING_KEY || getDefaultRelaySigningKey();
 

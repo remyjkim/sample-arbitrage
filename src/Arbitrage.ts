@@ -1,5 +1,5 @@
 import * as _ from "lodash";
-import { BigNumber, Contract, Wallet } from "ethers";
+import { BigNumber, Contract, Wallet, ethers } from "ethers";
 import { FlashbotsBundleProvider } from "@flashbots/ethers-provider-bundle";
 import { WETH_ADDRESS } from "./addresses";
 import { EthMarket } from "./EthMarket";
@@ -131,21 +131,22 @@ export class Arbitrage {
       const buyCalls = await bestCrossedMarket.buyFromMarket.sellTokensToNextMarket(WETH_ADDRESS, bestCrossedMarket.volume, bestCrossedMarket.sellToMarket);
       const inter = bestCrossedMarket.buyFromMarket.getTokensOut(WETH_ADDRESS, bestCrossedMarket.tokenAddress, bestCrossedMarket.volume)
       const sellCallData = await bestCrossedMarket.sellToMarket.sellTokens(bestCrossedMarket.tokenAddress, inter, this.bundleExecutorContract.address);
-
+      console.log(sellCallData)
       const targets: Array<string> = [...buyCalls.targets, bestCrossedMarket.sellToMarket.marketAddress]
       const payloads: Array<string> = [...buyCalls.data, sellCallData]
       console.log({targets, payloads})
       const minerReward = bestCrossedMarket.profit.mul(minerRewardPercentage).div(100);
       const transaction = await this.bundleExecutorContract.populateTransaction.uniswapWeth(bestCrossedMarket.volume, minerReward, targets, payloads, {
-        gasPrice: BigNumber.from(0),
-        gasLimit: BigNumber.from(1000000),
+        // gasPrice: BigNumber.from(5000000000),
+        gasLimit: BigNumber.from(20000000),
       });
 
       try {
         const estimateGas = await this.bundleExecutorContract.provider.estimateGas(
           {
             ...transaction,
-            from: this.executorWallet.address
+            from: this.executorWallet.address,
+            maxFeePerGas: ethers.utils.parseUnits('10','gwei'),
           })
         if (estimateGas.gt(1400000)) {
           console.log("EstimateGas succeeded, but suspiciously large: " + estimateGas.toString())
@@ -153,6 +154,8 @@ export class Arbitrage {
         }
         transaction.gasLimit = estimateGas.mul(2)
       } catch (e) {
+        console.log(e)
+        // console.log(provider.get)
         console.warn(`Estimate gas failure for ${JSON.stringify(bestCrossedMarket)}`)
         continue
       }
