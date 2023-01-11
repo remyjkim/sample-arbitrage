@@ -134,7 +134,7 @@ export class Arbitrage {
       const payloads: Array<string> = [...buyCalls.data, sellCallData]
       console.log({targets, payloads})
       const minerReward = bestCrossedMarket.profit.mul(minerRewardPercentage).div(100);
-      const transaction = await this.bundleExecutorContract.populateTransaction.uniswapWeth(bestCrossedMarket.volume, minerReward, targets, payloads, {
+      const transaction = await this.bundleExecutorContract.populateTransaction.uniswapERC20(bestCrossedMarket.tokenAddress, bestCrossedMarket.volume, minerReward, targets, payloads, {
         // gasPrice: BigNumber.from(5000000000),
         gasLimit: BigNumber.from(20000000),
       });

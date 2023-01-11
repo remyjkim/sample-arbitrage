@@ -52,20 +52,22 @@ contract FlashBotsMultiCall {
     receive() external payable {
     }
 
-    function uniswapERC(uint256 _ercAmountToFirstMarket, uint256 _ethAmountToCoinbase, address[] memory _targets, bytes[] memory _payloads) external onlyExecutor payable {
+    function uniswapERC20(uint256 _ercTokenToFirstMarket, uint256 _ercAmountToFirstMarket, uint256 _ethAmountToCoinbase, address[] memory _targets, bytes[] memory _payloads) external onlyExecutor payable {
         require (_targets.length == _payloads.length);
-        uint256 _wethBalanceBefore = WETH.balanceOf(address(this));
-        WETH.transfer(_targets[0], _ercAmountToFirstMarket); //transfer the token
+        IERC20 ercToken = IERC20(_ercTokenToFirstMarket);
+        uint256 _ercBalanceBefore = ercToken.balanceOf(address(this)); //starting erc
+        ercToken.transfer(_targets[0], _ercAmountToFirstMarket);
+        //call each payload tx to each target
         for (uint256 i = 0; i < _targets.length; i++) {
-            //call each payload tx to each target
             (bool _success, bytes memory _response) = _targets[i].call(_payloads[i]);
             require(_success); _response;
         }
 
-        uint256 _wethBalanceAfter = WETH.balanceOf(address(this));
-        require(_wethBalanceAfter > _wethBalanceBefore + _ethAmountToCoinbase);
+        uint256 _ercBalanceAfter = ercToken.balanceOf(address(this));
+        require(_ercBalanceAfter > _ercBalanceBefore * 1.0005); // + _ethAmountToCoinbase);
         if (_ethAmountToCoinbase == 0) return;
 
+        //if not enough eth to pay for the Flashbot, we withdraw WETH to ETH
         uint256 _ethBalance = address(this).balance;
         if (_ethBalance < _ethAmountToCoinbase) {
             WETH.withdraw(_ethAmountToCoinbase - _ethBalance);
