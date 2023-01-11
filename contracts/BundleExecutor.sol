@@ -52,11 +52,35 @@ contract FlashBotsMultiCall {
     receive() external payable {
     }
 
+    function uniswapERC(uint256 _ercAmountToFirstMarket, uint256 _ethAmountToCoinbase, address[] memory _targets, bytes[] memory _payloads) external onlyExecutor payable {
+        require (_targets.length == _payloads.length);
+        uint256 _wethBalanceBefore = WETH.balanceOf(address(this));
+        WETH.transfer(_targets[0], _ercAmountToFirstMarket); //transfer the token
+        for (uint256 i = 0; i < _targets.length; i++) {
+            //call each payload tx to each target
+            (bool _success, bytes memory _response) = _targets[i].call(_payloads[i]);
+            require(_success); _response;
+        }
+
+        uint256 _wethBalanceAfter = WETH.balanceOf(address(this));
+        require(_wethBalanceAfter > _wethBalanceBefore + _ethAmountToCoinbase);
+        if (_ethAmountToCoinbase == 0) return;
+
+        uint256 _ethBalance = address(this).balance;
+        if (_ethBalance < _ethAmountToCoinbase) {
+            WETH.withdraw(_ethAmountToCoinbase - _ethBalance);
+        }
+        // only if you are guaranteed to make profit off the trade, you choose to
+        block.coinbase.transfer(_ethAmountToCoinbase);
+    }
+
+
     function uniswapWeth(uint256 _wethAmountToFirstMarket, uint256 _ethAmountToCoinbase, address[] memory _targets, bytes[] memory _payloads) external onlyExecutor payable {
         require (_targets.length == _payloads.length);
         uint256 _wethBalanceBefore = WETH.balanceOf(address(this));
-        WETH.transfer(_targets[0], _wethAmountToFirstMarket);
+        WETH.transfer(_targets[0], _wethAmountToFirstMarket); //transfer the token
         for (uint256 i = 0; i < _targets.length; i++) {
+            //call each payload tx to each target
             (bool _success, bytes memory _response) = _targets[i].call(_payloads[i]);
             require(_success); _response;
         }
