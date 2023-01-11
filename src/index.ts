@@ -66,7 +66,10 @@ async function main() {
     const debug = false;
     // console.log("Start retrieving cycle scores...")
     const arbitrageData = await ARB.main(numberTokens, dexs, debug);
-    // arbitrage.takeCrossedMarkets(blockNumber, MINER_REWARD_PERCENTAGE, arbitrageData).then(healthcheck).catch(console.error)
+    // console.log("hi")
+    // console.log(arbitrageData)
+    // console.log("hi")
+    arbitrage.takeCrossedMarkets(blockNumber, MINER_REWARD_PERCENTAGE, arbitrageData).then(healthcheck).catch(console.error)
   })
 }
 

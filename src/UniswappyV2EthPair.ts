@@ -143,8 +143,11 @@ export class UniswappyV2EthPair extends EthMarket {
   }
 
   getTokensOut(tokenIn: string, tokenOut: string, amountIn: BigNumber): BigNumber {
+    console.log(tokenIn)
     const reserveIn = this._tokenBalances[tokenIn]
     const reserveOut = this._tokenBalances[tokenOut]
+    console.log("reserveIn", reserveIn)
+    // console
     return this.getAmountOut(reserveIn, reserveOut, amountIn);
   }
 
@@ -155,7 +158,8 @@ export class UniswappyV2EthPair extends EthMarket {
   }
 
   getAmountOut(reserveIn: BigNumber, reserveOut: BigNumber, amountIn: BigNumber): BigNumber {
-    const amountInWithFee: BigNumber = amountIn.mul(997);
+    const amountInWithFee: BigNumber = amountIn.mul(997)
+    console.log("hi")
     const numerator = amountInWithFee.mul(reserveOut);
     const denominator = reserveIn.mul(1000).add(amountInWithFee);
     return numerator.div(denominator);

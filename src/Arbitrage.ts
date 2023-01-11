@@ -4,16 +4,23 @@ import { FlashbotsBundleProvider } from "@flashbots/ethers-provider-bundle";
 import { WETH_ADDRESS } from "./addresses";
 import { EthMarket } from "./EthMarket";
 import { ETHER, bigNumberToDecimal } from "./utils";
+import {UniswappyV2EthPair} from "./UniswappyV2EthPair";
 
-export interface CrossedMarketDetails {
-  profit: BigNumber,
-  volume: BigNumber,
-  tokenAddress: string,
-  buyFromMarket: EthMarket,
-  sellToMarket: EthMarket,
+// export interface CrossedMarketDetails {
+//   profit: BigNumber,
+//   volume: BigNumber,
+//   tokenAddress: string,
+//   buyFromMarket: EthMarket,
+//   sellToMarket: EthMarket,
+// }
+
+export interface arbitrageDataRawDetails {
+  cycle: Array<string>,
+  pools: Array<EthMarket>,
+  cycleWeight: Array<Number>
 }
 
-export interface ArbitrageDetails {
+export interface CrossedMarketDetails {
   profit: BigNumber,
   volume: BigNumber,
   tokenAddress: Array<string>,
@@ -23,6 +30,7 @@ export interface ArbitrageDetails {
 export type MarketsByToken = { [tokenAddress: string]: Array<EthMarket> }
 
 // TODO: implement binary search (assuming linear/exponential global maximum profitability)
+const decimals = 18
 const TEST_VOLUMES = [
   ETHER.div(100),
   ETHER.div(10),
@@ -33,44 +41,53 @@ const TEST_VOLUMES = [
   ETHER.mul(2),
   ETHER.mul(5),
   ETHER.mul(10),
+  //   BigNumber.from(10**20),
+  // BigNumber.from(10**19),
+  // BigNumber.from(10).pow(decimals+2),
+  // BigNumber.from(10).pow(decimals+1),
+  // BigNumber.from(10).pow(decimals),
+  // BigNumber.from(10).pow(decimals-1),
 ]
 
-export function getBestCrossedMarket(crossedMarkets: Array<EthMarket>[], tokenAddress: string): CrossedMarketDetails | undefined {
-  let bestCrossedMarket: CrossedMarketDetails | undefined = undefined;
-  for (const crossedMarket of crossedMarkets) {
-    const sellToMarket = crossedMarket[0]
-    const buyFromMarket = crossedMarket[1]
+export function getBestCrossedMarket(arbitrageData: Array<arbitrageDataRawDetails>): Array<CrossedMarketDetails> | undefined {
+  // let bestCrossedMarket: CrossedMarketDetails | undefined = undefined;
+  // for (const crossedMarket of arbitrageData) {
+  
+  const bestCrossedMarkets = []
+  for (const bestCrossedMarket of arbitrageData) {
+    // console.log("Send this much WETH", bestCrossedMarket.volume.toString(), "get this much profit", bestCrossedMarket.profit.toString())
+    // const inter = bestCrossedMarket.volume
+    //
+    // }
+    // const sellToMarket = crossedMarket[0]
+    // const buyFromMarket = crossedMarket[1]
+    const profits = []
     for (const size of TEST_VOLUMES) {
-      const tokensOutFromBuyingSize = buyFromMarket.getTokensOut(WETH_ADDRESS, tokenAddress, size);
-      const proceedsFromSellingTokens = sellToMarket.getTokensOut(tokenAddress, WETH_ADDRESS, tokensOutFromBuyingSize)
+      let temp_size = size
+      for (let i = 0; i < bestCrossedMarket.pools.length - 1; i++) {
+        // const buyCalls = bestCrossedMarket.pools[i].getTokensOut(bestCrossedMarket.cycle[i], temp_size, bestCrossedMarket.pools[i+1]);
+        // console.log(typeof(temp_size))
+        temp_size = bestCrossedMarket.pools[i].getTokensOut(bestCrossedMarket.cycle[i], bestCrossedMarket.cycle[i + 1], temp_size)
+      }
+
+      // const tokensOutFromBuyingSize = buyFromMarket.getTokensOut(WETH_ADDRESS, tokenAddress, size);
+      const l = bestCrossedMarket.pools.length
+      const proceedsFromSellingTokens = bestCrossedMarket.pools[l - 1].getTokensOut(bestCrossedMarket.cycle[l - 1], bestCrossedMarket.cycle[l], BigNumber.from(temp_size))
       const profit = proceedsFromSellingTokens.sub(size);
-      if (bestCrossedMarket !== undefined && profit.lt(bestCrossedMarket.profit)) {
-        // If the next size up lost value, meet halfway. TODO: replace with real binary search
-        const trySize = size.add(bestCrossedMarket.volume).div(2)
-        const tryTokensOutFromBuyingSize = buyFromMarket.getTokensOut(WETH_ADDRESS, tokenAddress, trySize);
-        const tryProceedsFromSellingTokens = sellToMarket.getTokensOut(tokenAddress, WETH_ADDRESS, tryTokensOutFromBuyingSize)
-        const tryProfit = tryProceedsFromSellingTokens.sub(trySize);
-        if (tryProfit.gt(bestCrossedMarket.profit)) {
-          bestCrossedMarket = {
-            volume: trySize,
-            profit: tryProfit,
-            tokenAddress,
-            sellToMarket,
-            buyFromMarket
-          }
-        }
-        break;
+      profits.push(profit)
+      // const maxProfit = Math.max(profits)
+      const maxProfit = profits.reduce((a, b) => Math.max(a, b), -Infinity);
+      const bestMarket = {
+        volume: TEST_VOLUMES[profits.indexOf(maxProfit)],
+        profit: maxProfit,
+        tokenAddress: bestCrossedMarket.cycle,
+        poolAddress: bestCrossedMarket.pools
       }
-      bestCrossedMarket = {
-        volume: size,
-        profit: profit,
-        tokenAddress,
-        sellToMarket,
-        buyFromMarket
-      }
+      bestCrossedMarkets.push(bestMarket)
     }
+
   }
-  return bestCrossedMarket;
+  return bestCrossedMarkets;
 }
 
 export class Arbitrage {
@@ -84,67 +101,79 @@ export class Arbitrage {
     this.bundleExecutorContract = bundleExecutorContract;
   }
 
-  static printCrossedMarket(crossedMarket: CrossedMarketDetails): void {
-    const buyTokens = crossedMarket.buyFromMarket.tokens
-    const sellTokens = crossedMarket.sellToMarket.tokens
-    console.log(
-      `Profit: ${bigNumberToDecimal(crossedMarket.profit)} Volume: ${bigNumberToDecimal(crossedMarket.volume)}\n` +
-      `${crossedMarket.buyFromMarket.protocol} (${crossedMarket.buyFromMarket.marketAddress})\n` +
-      `  ${buyTokens[0]} => ${buyTokens[1]}\n` +
-      `${crossedMarket.sellToMarket.protocol} (${crossedMarket.sellToMarket.marketAddress})\n` +
-      `  ${sellTokens[0]} => ${sellTokens[1]}\n` +
-      `\n`
-    )
-  }
+  // static printCrossedMarket(crossedMarket: CrossedMarketDetails): void {
+  //   const buyTokens = crossedMarket.buyFromMarket.tokens
+  //   const sellTokens = crossedMarket.sellToMarket.tokens
+  //   console.log(
+  //     `Profit: ${bigNumberToDecimal(crossedMarket.profit)} Volume: ${bigNumberToDecimal(crossedMarket.volume)}\n` +
+  //     `${crossedMarket.buyFromMarket.protocol} (${crossedMarket.buyFromMarket.marketAddress})\n` +
+  //     `  ${buyTokens[0]} => ${buyTokens[1]}\n` +
+  //     `${crossedMarket.sellToMarket.protocol} (${crossedMarket.sellToMarket.marketAddress})\n` +
+  //     `  ${sellTokens[0]} => ${sellTokens[1]}\n` +
+  //     `\n`
+  //   )
+  // }
 
 
-  async evaluateMarkets(marketsByToken: MarketsByToken): Promise<Array<CrossedMarketDetails>> {
-    const bestCrossedMarkets = new Array<CrossedMarketDetails>()
-
-    for (const tokenAddress in marketsByToken) {
-      const markets = marketsByToken[tokenAddress]
-      const pricedMarkets = _.map(markets, (ethMarket: EthMarket) => {
-        return {
-          ethMarket: ethMarket,
-          buyTokenPrice: ethMarket.getTokensIn(tokenAddress, WETH_ADDRESS, ETHER.div(100)),
-          sellTokenPrice: ethMarket.getTokensOut(WETH_ADDRESS, tokenAddress, ETHER.div(100)),
-        }
-      });
-
-      const crossedMarkets = new Array<Array<EthMarket>>()
-      for (const pricedMarket of pricedMarkets) {
-        _.forEach(pricedMarkets, pm => {
-          if (pm.sellTokenPrice.gt(pricedMarket.buyTokenPrice)) {
-            crossedMarkets.push([pricedMarket.ethMarket, pm.ethMarket])
-          }
-        })
-      }
-
-      const bestCrossedMarket = getBestCrossedMarket(crossedMarkets, tokenAddress);
-      if (bestCrossedMarket !== undefined && bestCrossedMarket.profit.gt(ETHER.div(1000))) {
-        bestCrossedMarkets.push(bestCrossedMarket)
-      }
-    }
-    bestCrossedMarkets.sort((a, b) => a.profit.lt(b.profit) ? 1 : a.profit.gt(b.profit) ? -1 : 0)
-    return bestCrossedMarkets
-  }
+  // async evaluateMarkets(marketsByToken: MarketsByToken): Promise<Array<CrossedMarketDetails>> {
+  //   const bestCrossedMarkets = new Array<CrossedMarketDetails>()
+  //
+  //   for (const tokenAddress in marketsByToken) {
+  //     const markets = marketsByToken[tokenAddress]
+  //     const pricedMarkets = _.map(markets, (ethMarket: EthMarket) => {
+  //       return {
+  //         ethMarket: ethMarket,
+  //         buyTokenPrice: ethMarket.getTokensIn(tokenAddress, WETH_ADDRESS, ETHER.div(100)),
+  //         sellTokenPrice: ethMarket.getTokensOut(WETH_ADDRESS, tokenAddress, ETHER.div(100)),
+  //       }
+  //     });
+  //
+  //     const crossedMarkets = new Array<Array<EthMarket>>()
+  //     for (const pricedMarket of pricedMarkets) {
+  //       _.forEach(pricedMarkets, pm => {
+  //         if (pm.sellTokenPrice.gt(pricedMarket.buyTokenPrice)) {
+  //           crossedMarkets.push([pricedMarket.ethMarket, pm.ethMarket])
+  //         }
+  //       })
+  //     }
+  //
+  //     const bestCrossedMarket = getBestCrossedMarket(arbitrageData);
+  //     if (bestCrossedMarket !== undefined && bestCrossedMarket.profit.gt(ETHER.div(1000))) {
+  //       bestCrossedMarkets.push(bestCrossedMarket)
+  //     }
+  //   }
+  //   bestCrossedMarkets.sort((a, b) => a.profit.lt(b.profit) ? 1 : a.profit.gt(b.profit) ? -1 : 0)
+  //   return bestCrossedMarkets
+  // }
 
   // TODO: take more than 1
-  async takeCrossedMarkets(blockNumber: number, minerRewardPercentage: number, arbitrageData): Promise<void> {
+  async takeCrossedMarkets(blockNumber: number, minerRewardPercentage: number, arbitrageDataRaw:Array<any>): Promise<void> {
+    // for (arbitrageDataRaw)
+    // console.log(arbitrageDataRaw)
+    let pools_ = []
+    for (let i = 0; i< arbitrageDataRaw.length; i++){
+      let arb = arbitrageDataRaw[i]
+      for (let pool of arb.pools) {
+        pools_.push(new UniswappyV2EthPair(pool, ["",""],""))
+      }
+      arbitrageDataRaw[i].pools = pools_
+    }
+
+    const arbitrageData = getBestCrossedMarket(arbitrageDataRaw);
     for (const bestCrossedMarket of arbitrageData) {
       const targets = new Array<string>()
       const payloads = new Array<string>()
       console.log("Send this much WETH", bestCrossedMarket.volume.toString(), "get this much profit", bestCrossedMarket.profit.toString())
       const inter = bestCrossedMarket.volume
       for (let i=0; i< bestCrossedMarket.poolAddress.length-1; i++) {
-        const buyCalls = await bestCrossedMarket.poolAddress[i].sellTokensToNextMarket(bestCrossedMarket.tokenAddress[i], bestCrossedMarket.volume, bestCrossedMarket.sellToMarket);
-        const inter = bestCrossedMarket.poolAddress[i].getTokensOut(WETH_ADDRESS, bestCrossedMarket.tokenAddress, bestCrossedMarket.volume)
-        targets.push(buyCalls.targets)
-        payloads.push(buyCalls.targets)
+        const buyCalls = await bestCrossedMarket.poolAddress[i].sellTokensToNextMarket(bestCrossedMarket.tokenAddress[i], bestCrossedMarket.volume, bestCrossedMarket.poolAddress[i+1]);
+        const inter = bestCrossedMarket.poolAddress[i].getTokensOut(bestCrossedMarket.tokenAddress[i], bestCrossedMarket.tokenAddress[i+1], bestCrossedMarket.volume)
+        targets.push(buyCalls.targets[0])
+        payloads.push(buyCalls.data[0])
       }
       const sellCallData = await bestCrossedMarket.poolAddress[bestCrossedMarket.poolAddress.length-1]
           .sellTokens(bestCrossedMarket.tokenAddress[bestCrossedMarket.tokenAddress.length-2], inter, this.bundleExecutorContract.address);
-      targets.push(bestCrossedMarket.poolAddress[bestCrossedMarket.poolAddress.length-1])
+      targets.push(String(bestCrossedMarket.poolAddress[bestCrossedMarket.poolAddress.length-1]))
       payloads.push(sellCallData)
       // console.log(sellCallData)
       // const targets: Array<string> = [...buyCalls.targets, bestCrossedMarket.sellToMarket.marketAddress]
