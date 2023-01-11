@@ -149,13 +149,10 @@ async function calcArbitrage(g) {
 
       let prev = '';
       for (let c of cycle) {
-        if (result.previousVertices[c].value == prev) {
-          pools.push(result.previousVertices[c].edges.head.value.metadata.address);
+        if (prev != '') {
+          pools.push(g.findEdge(g.getVertexByKey(prev), g.getVertexByKey(c)).metadata.address)
         }
-        console.log('prev vertices')
-        console.log(result.previousVertices[c].edges.head)
-        console.log(result.previousVertices[c].edges.head.next)
-        prev = c;
+        prev = c
 
       }
       let cycleString = cycle.join('');
