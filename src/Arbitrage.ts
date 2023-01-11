@@ -124,9 +124,7 @@ export class Arbitrage {
 
   // TODO: take more than 1
   async takeCrossedMarkets(blockNumber: number, minerRewardPercentage: number, arbitrageData): Promise<void> {
-    for (const arbCycle of arbitrageData) {
-
-      
+    for (const bestCrossedMarket of arbitrageData) {
       console.log("Send this much WETH", bestCrossedMarket.volume.toString(), "get this much profit", bestCrossedMarket.profit.toString())
       const buyCalls = await bestCrossedMarket.buyFromMarket.sellTokensToNextMarket(WETH_ADDRESS, bestCrossedMarket.volume, bestCrossedMarket.sellToMarket);
       const inter = bestCrossedMarket.buyFromMarket.getTokensOut(WETH_ADDRESS, bestCrossedMarket.tokenAddress, bestCrossedMarket.volume)
@@ -136,7 +134,7 @@ export class Arbitrage {
       const payloads: Array<string> = [...buyCalls.data, sellCallData]
       console.log({targets, payloads})
       const minerReward = bestCrossedMarket.profit.mul(minerRewardPercentage).div(100);
-      const transaction = await this.bundleExecutorContract.populateTransaction.uniswapWeth(bestCrossedMarket.volume, minerReward, targets, payloads, {
+      const transaction = await this.bundleExecutorContract.populateTransaction.uniswapERC20(bestCrossedMarket.tokenAddress, bestCrossedMarket.volume, minerReward, targets, payloads, {
         // gasPrice: BigNumber.from(5000000000),
         gasLimit: BigNumber.from(20000000),
       });
