@@ -13,6 +13,13 @@ export interface CrossedMarketDetails {
   sellToMarket: EthMarket,
 }
 
+export interface ArbitrageDetails {
+  profit: BigNumber,
+  volume: BigNumber,
+  tokenAddress: Array<string>,
+  poolAddress: Array<EthMarket>
+}
+
 export type MarketsByToken = { [tokenAddress: string]: Array<EthMarket> }
 
 // TODO: implement binary search (assuming linear/exponential global maximum profitability)
@@ -125,13 +132,23 @@ export class Arbitrage {
   // TODO: take more than 1
   async takeCrossedMarkets(blockNumber: number, minerRewardPercentage: number, arbitrageData): Promise<void> {
     for (const bestCrossedMarket of arbitrageData) {
+      const targets = new Array<string>()
+      const payloads = new Array<string>()
       console.log("Send this much WETH", bestCrossedMarket.volume.toString(), "get this much profit", bestCrossedMarket.profit.toString())
-      const buyCalls = await bestCrossedMarket.buyFromMarket.sellTokensToNextMarket(WETH_ADDRESS, bestCrossedMarket.volume, bestCrossedMarket.sellToMarket);
-      const inter = bestCrossedMarket.buyFromMarket.getTokensOut(WETH_ADDRESS, bestCrossedMarket.tokenAddress, bestCrossedMarket.volume)
-      const sellCallData = await bestCrossedMarket.sellToMarket.sellTokens(bestCrossedMarket.tokenAddress, inter, this.bundleExecutorContract.address);
+      const inter = bestCrossedMarket.volume
+      for (let i=0; i< bestCrossedMarket.poolAddress.length-1; i++) {
+        const buyCalls = await bestCrossedMarket.poolAddress[i].sellTokensToNextMarket(bestCrossedMarket.tokenAddress[i], bestCrossedMarket.volume, bestCrossedMarket.sellToMarket);
+        const inter = bestCrossedMarket.poolAddress[i].getTokensOut(WETH_ADDRESS, bestCrossedMarket.tokenAddress, bestCrossedMarket.volume)
+        targets.push(buyCalls.targets)
+        payloads.push(buyCalls.targets)
+      }
+      const sellCallData = await bestCrossedMarket.poolAddress[bestCrossedMarket.poolAddress.length-1]
+          .sellTokens(bestCrossedMarket.tokenAddress[bestCrossedMarket.tokenAddress.length-2], inter, this.bundleExecutorContract.address);
+      targets.push(bestCrossedMarket.poolAddress[bestCrossedMarket.poolAddress.length-1])
+      payloads.push(sellCallData)
       // console.log(sellCallData)
-      const targets: Array<string> = [...buyCalls.targets, bestCrossedMarket.sellToMarket.marketAddress]
-      const payloads: Array<string> = [...buyCalls.data, sellCallData]
+      // const targets: Array<string> = [...buyCalls.targets, bestCrossedMarket.sellToMarket.marketAddress]
+      // const payloads: Array<string> = [...buyCalls.data, sellCallData]
       console.log({targets, payloads})
       const minerReward = bestCrossedMarket.profit.mul(minerRewardPercentage).div(100);
       const transaction = await this.bundleExecutorContract.populateTransaction.uniswapERC20(bestCrossedMarket.tokenAddress, bestCrossedMarket.volume, minerReward, targets, payloads, {
