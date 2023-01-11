@@ -7,6 +7,10 @@ import { Arbitrage } from "./Arbitrage";
 import { get } from "https"
 import { getDefaultRelaySigningKey } from "./utils";
 
+import * as ARB from './pathfinder/arbitrage';
+import { DEX } from './pathfinder/constants';
+import { print } from "graphql";
+
 const ETHEREUM_RPC_URL = process.env.ETHEREUM_RPC_URL || "https://eth-goerli.g.alchemy.com/v2/ohnv0w4gls6xU1jy3y3bF0jHvf-7JXWE"
 const PRIVATE_KEY = process.env.PRIVATE_KEY || "733d5b17a322079b0cb48211b27bf492a797298cf2091e84164b0f3811bddadd"
 const BUNDLE_EXECUTOR_ADDRESS = process.env.BUNDLE_EXECUTOR_ADDRESS || "0xC642343309a357BC53021c7187B41b25e063218c"
@@ -55,14 +59,16 @@ async function main() {
 
   const markets = await UniswappyV2EthPair.getUniswapMarketsByToken(provider, FACTORY_ADDRESSES);
   provider.on('block', async (blockNumber) => {
-    await UniswappyV2EthPair.updateReserves(provider, markets.allMarketPairs);
-    const bestCrossedMarkets = await arbitrage.evaluateMarkets(markets.marketsByToken);
-    if (bestCrossedMarkets.length === 0) {
-      console.log("No crossed markets")
-      return
-    }
-    bestCrossedMarkets.forEach(Arbitrage.printCrossedMarket);
-    arbitrage.takeCrossedMarkets(bestCrossedMarkets, blockNumber, MINER_REWARD_PERCENTAGE).then(healthcheck).catch(console.error)
+    const numberTokens = 5;
+    const dexs: Set<DEX> = new Set();
+    dexs.add(DEX.UniswapV3);
+    // dexs.add(DEX.Sushiswap);
+    const debug = true;
+    console.log("Start retrieving cycle scores...")
+    const arbitrageData = await ARB.main(numberTokens, dexs, debug);
+    console.log(arbitrageData)
+
+    arbitrage.takeCrossedMarkets(blockNumber, MINER_REWARD_PERCENTAGE, arbitrageData).then(healthcheck).catch(console.error)
   })
 }
 
