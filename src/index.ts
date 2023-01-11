@@ -59,16 +59,14 @@ async function main() {
 
   const markets = await UniswappyV2EthPair.getUniswapMarketsByToken(provider, FACTORY_ADDRESSES);
   provider.on('block', async (blockNumber) => {
-    const numberTokens = 5;
+    const numberTokens =5;
     const dexs: Set<DEX> = new Set();
     dexs.add(DEX.UniswapV3);
-    // dexs.add(DEX.Sushiswap);
-    const debug = true;
-    console.log("Start retrieving cycle scores...")
+    dexs.add(DEX.Sushiswap);
+    const debug = false;
+    // console.log("Start retrieving cycle scores...")
     const arbitrageData = await ARB.main(numberTokens, dexs, debug);
-    console.log(arbitrageData)
-
-    arbitrage.takeCrossedMarkets(blockNumber, MINER_REWARD_PERCENTAGE, arbitrageData).then(healthcheck).catch(console.error)
+    // arbitrage.takeCrossedMarkets(blockNumber, MINER_REWARD_PERCENTAGE, arbitrageData).then(healthcheck).catch(console.error)
   })
 }
 

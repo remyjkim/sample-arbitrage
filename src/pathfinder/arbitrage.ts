@@ -7,6 +7,7 @@ import GraphVertex from './graph_library/GraphVertex';
 import GraphEdge from './graph_library/GraphEdge';
 import bellmanFord from './bellman-ford';
 import { DEX, MIN_TVL } from './constants';
+import { print, printIntrospectionSchema } from 'graphql';
 
 // Fetch most active tokens 
 async function fetchTokens(first: any, skip = 0, dex: DEX) {
@@ -81,7 +82,7 @@ async function fetchPoolPrices(g: Graph, pools: Set<string>, dex: DEX, debug: bo
     let DEX_ENDPOINT =  (dex === DEX.UniswapV3) ? UNISWAP.ENDPOINT :
                         (dex === DEX.Sushiswap) ? SUSHISWAP.ENDPOINT : "";
     let DEX_QUERY =     (dex === DEX.UniswapV3) ? UNISWAP.fetch_pool(pool) :
-                        (dex === DEX.Sushiswap) ? SUSHISWAP.PAIR(pool) : "";;
+                        (dex === DEX.Sushiswap) ? SUSHISWAP.PAIR(pool) : "";
 
     let poolRequest = await request(DEX_ENDPOINT, DEX_QUERY);
     let poolData =  (dex === DEX.UniswapV3) ? poolRequest.pool :
@@ -141,13 +142,27 @@ async function calcArbitrage(g) {
   let uniqueCycle = {};
   g.getAllVertices().forEach((vertex) => {
     let result = bellmanFord(g, vertex);
+    console.log(result)
     let cyclePaths = result.cyclePaths;
     for (var cycle of cyclePaths) {
+      let pools = [];
+
+      let prev = '';
+      for (let c of cycle) {
+        if (result.previousVertices[c].value == prev) {
+          pools.push(result.previousVertices[c].edges.head.value.metadata.address);
+        }
+        console.log('prev vertices')
+        console.log(result.previousVertices[c].edges.head)
+        console.log(result.previousVertices[c].edges.head.next)
+        prev = c;
+
+      }
       let cycleString = cycle.join('');
       let cycleWeight = calculatePathWeight(g, cycle);
       if (!uniqueCycle[cycleString]) {
         uniqueCycle[cycleString] = true;
-        arbitrageData.push({ cycle: cycle, cycleWeight: cycleWeight });
+        arbitrageData.push({ cycle: cycle, cycleWeight: cycleWeight, pools: pools });
       }
     }
   });
@@ -176,11 +191,12 @@ async function main(numberTokens: number = 5, DEXs: Set<DEX>, debug: boolean = f
   }
 
   let arbitrageData = await calcArbitrage(g);
-  // console.log(`Cycles:`, arbitrageData);
-  // console.log(`There were ${arbitrageData.length} arbitrage cycles detected.`);
+  console.log(`Cycles:`, arbitrageData);
+  console.log(`There were ${arbitrageData.length} arbitrage cycles detected.`);
 
-  return arbitrageData
   // printGraphEdges(g);
+  return arbitrageData
+  
 }
 
 // debugging stuff
